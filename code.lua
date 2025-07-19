@@ -1,4 +1,3 @@
--- File: core.lua (Host this on GitHub)
 local global_container
 do
 	local finder_code, global_container_obj = (function()

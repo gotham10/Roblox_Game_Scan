@@ -159,6 +159,9 @@ if not genv.scriptcache then
 end
 local ldeccache = genv.scriptcache
 
+local can_write_file, writefile_func = pcall(function() return writefile end)
+local can_make_folder, make_folder_func = pcall(function() return makefolder or makedir end)
+
 local StatusGui = Instance.new("ScreenGui")
 local StatusText = Instance.new("TextLabel")
 local function updateStatus(text, color)
@@ -368,6 +371,28 @@ local function decompileAllScripts()
 		["CoreScripts"] = true,
 		["RobloxPluginGuiService"] = true
 	}
+	
+	local totalScripts = 0
+	local function countScripts(instance)
+		if IGNORE_LIST[instance.Name] then return end
+		local success, isScript = pcall(function() return instance:IsA("LuaSourceContainer") end)
+		if success and isScript then
+			totalScripts = totalScripts + 1
+		end
+		local success_children, children = pcall(function() return instance:GetChildren() end)
+		if success_children and children then
+			for _, child in ipairs(children) do
+				countScripts(child)
+			end
+		end
+	end
+	updateStatus("Scanning for scripts...", Color3.new(1, 1, 0))
+	task.wait()
+	for _, service in ipairs(SERVICES_TO_SCAN) do
+		countScripts(service)
+	end
+
+	local currentScript = 0
 	local crawlForScripts
 	crawlForScripts = function(instance)
 		if IGNORE_LIST[instance.Name] then
@@ -375,8 +400,9 @@ local function decompileAllScripts()
 		end
 		local success, isScript = pcall(function() return instance:IsA("LuaSourceContainer") end)
 		if success and isScript then
+			currentScript = currentScript + 1
 			local path = instance:GetFullName()
-			updateStatus("Decompiling: " .. path:sub(1, 40), Color3.new(0.9, 0.9, 0.9))
+			updateStatus(string.format("Decompiling (%d/%d): %s", currentScript, totalScripts, path:sub(1, 40)), Color3.new(0.9, 0.9, 0.9))
 			task.wait()
 			local source_success, source_code = getScriptSource(instance)
 			if source_success then
@@ -426,14 +452,13 @@ task.spawn(function()
 	end
 	task.wait(1)
 
-	updateStatus("Decompiling all scripts...", Color3.new(1, 1, 0))
-	task.wait()
 	local decompile_success, script_data = pcall(decompileAllScripts)
 	if decompile_success and script_data then
 		full_context = full_context .. "\n\n--- CLIENT SCRIPT DUMP ---\n" .. script_data
 		updateStatus("Decompilation complete.", Color3.new(0.5, 1, 0.5))
 	else
 		updateStatus("Decompilation failed.", Color3.new(1, 0.5, 0))
+		warn("Decompile Error:", script_data)
 	end
 	task.wait(1)
 	
@@ -444,8 +469,22 @@ task.spawn(function()
 		return
 	end
 
-	if #full_context > 2000000 then
-		updateStatus("Error: Decompiled data is too large for AI.", Color3.new(1, 0.2, 0.2))
+	if #full_context > 3500000 then
+		if can_write_file and can_make_folder then
+			pcall(make_folder_func, "GameDumps")
+			local game_name_success, product_info = pcall(function() return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId) end)
+			local game_name = (game_name_success and product_info.Name) or "UnknownGame"
+			game_name = game_name:gsub("[^%w_]", "")
+			local file_name = string.format("GameDumps/%s_FullDump.txt", game_name)
+			local write_success = pcall(writefile_func, file_name, full_context)
+			if write_success then
+				updateStatus("Data too large for AI. Saved to " .. file_name, Color3.new(1, 0.5, 0))
+			else
+				updateStatus("Data too large. Failed to save to file.", Color3.new(1, 0.2, 0.2))
+			end
+		else
+			updateStatus("Error: Data too large for AI.", Color3.new(1, 0.2, 0.2))
+		end
 		task.wait(10)
 		StatusGui:Destroy()
 		return

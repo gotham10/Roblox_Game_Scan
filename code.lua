@@ -1,5 +1,5 @@
 local question = getgenv().question or ""
-local k = "AIzaSyAB2mqCTCX_oAlPfPdW1LChUXFkk8YeWG0"
+local k = ""
 local model = "models/gemini-2.5-flash"
 local u = "https://generativelanguage.googleapis.com/v1beta/" .. model .. ":generateContent?key=" .. k
 local h = game:GetService("HttpService")

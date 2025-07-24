@@ -1,5 +1,5 @@
 return function(question)
-	local k = "AIzaSyAB2mqCTCX_oAlPfPdW1LChUXFkk8YeWG0"
+	local k = ""
 	local model = "models/gemini-1.5-flash-latest"
 	local u = "https://generativelanguage.googleapis.com/v1beta/" .. model .. ":generateContent?key=" .. k
 	local h = game:GetService("HttpService")
